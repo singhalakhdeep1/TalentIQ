@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: talentiq-postgres
+  namespace: talentiq
+spec:
+  serviceName: talentiq-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: talentiq-postgres
+  template:
+    metadata:
+      labels:
+        app: talentiq-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: talentiq
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: talentiq-secrets
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: talentiq-secrets
+                  key: postgres-password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: talentiq-postgres
+  namespace: talentiq
+spec:
+  selector:
+    app: talentiq-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

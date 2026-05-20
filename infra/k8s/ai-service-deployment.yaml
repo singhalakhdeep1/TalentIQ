@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talentiq-ai-service
+  namespace: talentiq
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: talentiq-ai-service
+  template:
+    metadata:
+      labels:
+        app: talentiq-ai-service
+    spec:
+      containers:
+        - name: ai-service
+          image: talentiq-ai-service:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: talentiq-secrets
+                  key: openai-api-key
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: talentiq-ai-service
+  namespace: talentiq
+spec:
+  selector:
+    app: talentiq-ai-service
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000

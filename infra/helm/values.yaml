@@ -1,0 +1,10 @@
+api:
+  image: talentiq-api:latest
+  replicas: 2
+aiService:
+  image: talentiq-ai-service:latest
+  replicas: 2
+postgres:
+  storage: 20Gi
+neo4j:
+  storage: 15Gi

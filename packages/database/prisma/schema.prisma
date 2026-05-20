@@ -1,0 +1,312 @@
+// TalentIQ — Prisma Schema
+// PostgreSQL 16 + pgvector extension
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector", schema: "public"), uuid_ossp(map: "uuid-ossp", schema: "public")]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USERS & ORGANIZATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole @default(RECRUITER)
+  organizationId String?
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  createdJobs  Job[]          @relation("CreatedBy")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  RECRUITER
+  HIRING_MANAGER
+  VIEWER
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  domain      String?  @unique
+  logoUrl     String?
+  plan        String   @default("FREE")
+  users       User[]
+  jobs        Job[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("organizations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANDIDATES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Candidate {
+  id                 String    @id @default(uuid())
+  userId             String?
+  firstName          String
+  lastName           String
+  email              String    @unique
+  phone              String?
+  linkedinUrl        String?
+  portfolioUrl       String?
+  status             String    @default("ACTIVE")
+
+  // Resume storage
+  resumeStorageKey   String?
+  resumeFileName     String?
+  resumeUploadedAt   DateTime?
+
+  applications  Application[]
+  embedding     CandidateEmbedding?
+  voiceSessions VoiceSession[]
+  scores        CandidateScore[]
+  credentials   Credential[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("candidates")
+}
+
+model CandidateEmbedding {
+  id          String   @id @default(uuid())
+  candidateId String   @unique
+  // pgvector — 3072 dims for text-embedding-3-large
+  embedding   Unsupported("vector(3072)")?
+  model       String
+  parsedData  Json?    // structured resume data from GPT-4
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_embeddings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOBS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Job {
+  id             String   @id @default(uuid())
+  organizationId String
+  title          String
+  department     String
+  location       String
+  workType       WorkType @default(HYBRID)
+  description    String   @db.Text
+  requirements   String   @db.Text
+  status         JobStatus @default(OPEN)
+  salaryMin      Int?
+  salaryMax      Int?
+  salaryCurrency String   @default("USD")
+  requiredSkills String[]
+  niceToHaveSkills String[]
+  createdById    String
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  createdBy    User           @relation("CreatedBy", fields: [createdById], references: [id])
+  applications Application[]
+  interviews   Interview[]
+  embedding    JobEmbedding?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("jobs")
+}
+
+enum WorkType {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  PAUSED
+  CLOSED
+  FILLED
+}
+
+model JobEmbedding {
+  id        String   @id @default(uuid())
+  jobId     String   @unique
+  embedding Unsupported("vector(3072)")?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_embeddings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APPLICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Application {
+  id              String    @id @default(uuid())
+  candidateId     String
+  jobId           String
+  status          String    @default("APPLIED")
+  statusReason    String?
+  statusUpdatedAt DateTime?
+  appliedAt       DateTime  @default(now())
+
+  candidate  Candidate       @relation(fields: [candidateId], references: [id])
+  job        Job             @relation(fields: [jobId], references: [id])
+  interviews Interview[]
+  scores     CandidateScore[]
+
+  @@unique([candidateId, jobId])
+  @@map("applications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERVIEWS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Interview {
+  id              String        @id @default(uuid())
+  candidateId     String
+  jobId           String
+  applicationId   String?
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  completedAt     DateTime?
+  interviewType   InterviewType @default(VOICE)
+  status          String        @default("SCHEDULED")
+  scheduledById   String?
+
+  candidate    Candidate     @relation(fields: [candidateId], references: [id])
+  job          Job           @relation(fields: [jobId], references: [id])
+  application  Application?  @relation(fields: [applicationId], references: [id])
+  voiceSession VoiceSession?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("interviews")
+}
+
+enum InterviewType {
+  VOICE
+  VIDEO
+  TECHNICAL
+  HR
+  PANEL
+}
+
+model VoiceSession {
+  id               String   @id @default(uuid())
+  interviewId      String   @unique
+  candidateId      String
+  jobId            String
+  transcript       String?  @db.Text
+  startedAt        DateTime
+  endedAt          DateTime?
+  durationSeconds  Int?
+  status           String   @default("IN_PROGRESS")
+  analysisResult   Json?    // GPT-4 structured analysis
+  aiScore          Int?     // 0–100
+
+  interview  Interview @relation(fields: [interviewId], references: [id])
+  candidate  Candidate @relation(fields: [candidateId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("voice_sessions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCORING
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CandidateScore {
+  id               String   @id @default(uuid())
+  candidateId      String
+  jobId            String
+  applicationId    String?
+  resumeScore      Int      @default(0)
+  skillsMatchScore Int      @default(0)
+  interviewScore   Int?
+  overallScore     Int      @default(0)
+  aiJustification  String?  @db.Text
+  scoredAt         DateTime @default(now())
+
+  candidate   Candidate    @relation(fields: [candidateId], references: [id])
+  application Application? @relation(fields: [applicationId], references: [id])
+
+  @@unique([candidateId, jobId])
+  @@map("candidate_scores")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EVENT STORE (append-only, immutable)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DomainEvent {
+  id             String   @id @default(uuid())
+  aggregateId    String
+  aggregateType  String
+  eventType      String
+  eventVersion   Int
+  payload        Json
+  metadata       Json?
+  occurredAt     DateTime @default(now())
+
+  @@index([aggregateId, eventVersion])
+  @@index([aggregateType, occurredAt])
+  @@index([eventType, occurredAt])
+  @@map("domain_events")
+}
+
+model AggregateSnapshot {
+  id            String   @id @default(uuid())
+  aggregateId   String   @unique
+  aggregateType String
+  version       Int
+  state         Json
+  createdAt     DateTime @default(now())
+
+  @@map("aggregate_snapshots")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BLOCKCHAIN CREDENTIALS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Credential {
+  id              String   @id @default(uuid())
+  candidateId     String
+  tokenId         String   @unique
+  txHash          String   @unique
+  contractAddress String
+  walletAddress   String
+  metadata        Json
+  mintedAt        DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+
+  @@map("credentials")
+}
