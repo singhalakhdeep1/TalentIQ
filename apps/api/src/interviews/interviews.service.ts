@@ -26,6 +26,10 @@ export class InterviewsService {
         this.aiServiceBaseUrl = config.get<string>('aiService.url', 'http://ai-service:8000');
     }
 
+    private hasOpenAiKey(): boolean {
+        return Boolean(this.config.get<string>('openai.apiKey'));
+    }
+
     // ─── Get AI-generated opening question for a job ──────────────────────────
     async getOpeningQuestion(jobId: string): Promise<string> {
         const job = await this.prisma.job.findUniqueOrThrow({
@@ -33,24 +37,33 @@ export class InterviewsService {
             select: { title: true, description: true, requirements: true },
         });
 
-        const completion = await this.openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-                {
-                    role: 'system',
-                    content:
-                        'You are a professional technical interviewer. Ask a single, open-ended opening question relevant to the role. Keep it concise (2 sentences max).',
-                },
-                {
-                    role: 'user',
-                    content: `Role: ${job.title}\nDescription: ${job.description}\nRequirements: ${job.requirements}`,
-                },
-            ],
-            max_tokens: 150,
-            temperature: 0.7,
-        });
+        if (!this.hasOpenAiKey()) {
+            return `Tell me about the most relevant work you have done for a ${job.title} role and how it maps to these requirements: ${job.requirements.slice(0, 140)}.`;
+        }
 
-        return completion.choices[0].message.content ?? 'Tell me about yourself and why you are interested in this role.';
+        try {
+            const completion = await this.openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [
+                    {
+                        role: 'system',
+                        content:
+                            'You are a professional technical interviewer. Ask a single, open-ended opening question relevant to the role. Keep it concise (2 sentences max).',
+                    },
+                    {
+                        role: 'user',
+                        content: `Role: ${job.title}\nDescription: ${job.description}\nRequirements: ${job.requirements}`,
+                    },
+                ],
+                max_tokens: 150,
+                temperature: 0.7,
+            });
+
+            return completion.choices[0].message.content ?? 'Tell me about yourself and why you are interested in this role.';
+        } catch (error: any) {
+            this.logger.warn(`Opening question fallback used: ${error.message}`);
+            return `What has prepared you most for this ${job.title} opportunity? Focus on outcomes, tools, and scope.`;
+        }
     }
 
     // ─── Get AI follow-up based on candidate answer ──────────────────────────
@@ -62,29 +75,38 @@ export class InterviewsService {
         // Stop after 5 questions
         if (questionIndex >= 4) return null;
 
-        const completion = await this.openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-                {
-                    role: 'system',
-                    content:
-                        'You are a professional interviewer. Based on the candidate answer, ask ONE precise follow-up question. If no follow-up is needed, return exactly "DONE".',
-                },
-                {
-                    role: 'user',
-                    content: `Candidate answered: "${previousAnswer}"\n\nQuestion ${questionIndex + 1} of 5 asked so far.`,
-                },
-            ],
-            max_tokens: 100,
-            temperature: 0.6,
-        });
+        if (!this.hasOpenAiKey()) {
+            return this.buildFallbackFollowUp(previousAnswer, questionIndex);
+        }
 
-        const response = completion.choices[0].message.content?.trim();
-        return response === 'DONE' ? null : (response ?? null);
+        try {
+            const completion = await this.openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [
+                    {
+                        role: 'system',
+                        content:
+                            'You are a professional interviewer. Based on the candidate answer, ask ONE precise follow-up question. If no follow-up is needed, return exactly "DONE".',
+                    },
+                    {
+                        role: 'user',
+                        content: `Candidate answered: "${previousAnswer}"\n\nQuestion ${questionIndex + 1} of 5 asked so far.`,
+                    },
+                ],
+                max_tokens: 100,
+                temperature: 0.6,
+            });
+
+            const response = completion.choices[0].message.content?.trim();
+            return response === 'DONE' ? null : (response ?? null);
+        } catch (error: any) {
+            this.logger.warn(`Follow-up question fallback used: ${error.message}`);
+            return this.buildFallbackFollowUp(previousAnswer, questionIndex);
+        }
     }
 
     // ─── Transcribe audio chunk via Whisper ───────────────────────────────────
-    async transcribeAudioChunk(audioBuffer: Buffer, mimeType: string): Promise<string> {
+    async transcribeAudioChunk(audioBuffer: Uint8Array, mimeType: string): Promise<string> {
         const formData = new FormData();
         const ext = mimeType.includes('webm') ? 'webm' : 'wav';
         formData.append('file', new Blob([audioBuffer], { type: mimeType }), `audio.${ext}`);
@@ -117,7 +139,13 @@ export class InterviewsService {
         transcript: string,
         startedAt: Date,
         reason: 'COMPLETED' | 'ABANDONED' | 'ERROR',
-    ): Promise<void> {
+    ): Promise<{
+        score: number;
+        strengths: string[];
+        concerns: string[];
+        recommendation: 'ADVANCE' | 'HOLD' | 'REJECT';
+        summary: string;
+    } | null> {
         const endedAt = new Date();
         const durationSeconds = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
 
@@ -181,6 +209,37 @@ export class InterviewsService {
             this.logger.log(
                 `Interview analysis complete for ${interviewId}: score=${analysis.score}, recommendation=${analysis.recommendation}`,
             );
+
+            return analysis;
         }
+
+        if (reason === 'COMPLETED' && transcript.length > 0) {
+            return {
+                score: 45,
+                strengths: ['Candidate provided partial response history.'],
+                concerns: ['Transcript too short for reliable evaluation.'],
+                recommendation: 'HOLD',
+                summary: 'Interview captured limited transcript. Collect more response time or ask another round of questions.',
+            };
+        }
+
+        return null;
+    }
+
+    private buildFallbackFollowUp(previousAnswer: string, questionIndex: number): string | null {
+        if (questionIndex >= 4) return null;
+
+        const normalized = previousAnswer.toLowerCase();
+        if (normalized.includes('team') || normalized.includes('stakeholder')) {
+            return 'Describe a time you aligned multiple stakeholders around a difficult decision and what tradeoff you made.';
+        }
+        if (normalized.includes('performance') || normalized.includes('scale')) {
+            return 'What specific metric improved, and what did you change technically to move it?';
+        }
+        if (normalized.includes('incident') || normalized.includes('issue')) {
+            return 'How did you diagnose the problem, communicate risk, and prevent the same failure afterward?';
+        }
+
+        return 'What was the hardest part of that work, and how would you approach it differently today?';
     }
 }

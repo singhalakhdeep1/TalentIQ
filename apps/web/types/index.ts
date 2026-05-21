@@ -8,6 +8,13 @@ export interface Job {
     createdAt?: string;
 }
 
+export interface PaginationMeta {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+}
+
 export interface Candidate {
     id: string;
     firstName: string;

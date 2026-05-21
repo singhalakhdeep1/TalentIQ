@@ -11,6 +11,8 @@ import { UseGuards, Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { InterviewsService } from './interviews.service';
 
+declare function atob(data: string): string;
+
 interface VoiceSessionContext {
     interviewId: string;
     candidateId: string;
@@ -26,6 +28,11 @@ export class InterviewGateway implements OnGatewayConnection, OnGatewayDisconnec
     private readonly sessions = new Map<string, VoiceSessionContext>();
 
     constructor(private readonly interviewsService: InterviewsService) { }
+
+    private decodeBase64Audio(encoded: string): Uint8Array {
+        const decoded = atob(encoded);
+        return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+    }
 
     handleConnection(client: Socket) {
         this.logger.log(`Client connected: ${client.id}`);
@@ -65,15 +72,24 @@ export class InterviewGateway implements OnGatewayConnection, OnGatewayDisconnec
     @SubscribeMessage('interview:audio-chunk')
     async handleAudioChunk(
         @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { audio: string; mimeType: string },
+        @MessageBody() payload: { audio?: string; audioBuffer?: number[]; mimeType?: string },
     ) {
         const session = this.sessions.get(client.id);
         if (!session) return client.emit('error', { message: 'No active session' });
 
+        const mimeType = payload.mimeType ?? 'audio/webm';
+        const binaryAudio = payload.audio
+            ? this.decodeBase64Audio(payload.audio)
+            : Uint8Array.from(payload.audioBuffer ?? []);
+
+        if (binaryAudio.length === 0) {
+            return client.emit('error', { message: 'Empty audio chunk received' });
+        }
+
         // Transcribe via Whisper (delegated to AI microservice)
         const transcript = await this.interviewsService.transcribeAudioChunk(
-            Buffer.from(payload.audio, 'base64'),
-            payload.mimeType,
+            binaryAudio,
+            mimeType,
         );
 
         if (transcript) {
@@ -120,7 +136,7 @@ export class InterviewGateway implements OnGatewayConnection, OnGatewayDisconnec
 
         this.sessions.delete(client.id);
 
-        await this.interviewsService.finalizeSession(
+        const analysis = await this.interviewsService.finalizeSession(
             session.interviewId,
             session.candidateId,
             session.jobId,
@@ -128,6 +144,17 @@ export class InterviewGateway implements OnGatewayConnection, OnGatewayDisconnec
             session.startedAt,
             payload.reason,
         );
+
+        if (analysis) {
+            client.emit('interview:analysis', analysis);
+        }
+
+        client.emit('interview:complete', {
+            message:
+                payload.reason === 'COMPLETED'
+                    ? 'Interview completed. Analysis is ready.'
+                    : `Interview ended with status ${payload.reason}.`,
+        });
 
         this.logger.log(`Interview session ended: ${session.interviewId} (${payload.reason})`);
     }

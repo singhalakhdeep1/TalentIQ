@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,6 +24,15 @@ export class AiController {
         @Body() body: { limit?: number; threshold?: number },
     ) {
         return this.aiService.findSimilarCandidates(jobId, body.limit, body.threshold);
+    }
+
+    @Get('jobs/:jobId/candidates/:candidateId/brief')
+    @ApiOperation({ summary: 'Generate recruiter brief with fit, strengths, concerns, and recommendation' })
+    async recruiterBrief(
+        @Param('jobId') jobId: string,
+        @Param('candidateId') candidateId: string,
+    ) {
+        return this.aiService.generateRecruiterBrief(candidateId, jobId);
     }
 
     @Post('jobs/:jobId/screen/:candidateId')
