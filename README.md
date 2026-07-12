@@ -140,6 +140,7 @@ talentiq/
 ### Quick Start
 
 1. **Clone and Install**
+
    ```bash
    git clone <repository-url>
    cd talentiq
@@ -148,8 +149,9 @@ talentiq/
    ```
 
 2. **Configure Environment**
-   
+
    Edit `.env` and configure services:
+
    ```env
    DATABASE_URL=postgresql://talentiq:talentiq_secret@localhost:5432/talentiq
    REDIS_URL=redis://localhost:6379
@@ -164,12 +166,14 @@ talentiq/
    ```
 
 3. **Generate Database Schema**
+
    ```bash
    pnpm db:generate
    pnpm db:migrate
    ```
 
 4. **Start Development**
+
    ```bash
    pnpm dev
    ```
@@ -192,23 +196,23 @@ docker compose up --build
 
 **Infrastructure Services:**
 
-| Service | Port(s) | Description |
-|---------|---------|-------------|
-| **PostgreSQL** | 5432 | Primary database with pgvector |
-| **Redis** | 6379 | Cache and session store |
-| **Neo4j** | 7474, 7687 | Skills graph database |
-| **ClickHouse** | 8123, 9000 | Analytics OLAP database |
-| **MinIO** | 9002, 9003 | Object storage (API + Console) |
-| **Kafka** | 9092 | Event streaming |
+| Service        | Port(s)    | Description                    |
+| -------------- | ---------- | ------------------------------ |
+| **PostgreSQL** | 5432       | Primary database with pgvector |
+| **Redis**      | 6379       | Cache and session store        |
+| **Neo4j**      | 7474, 7687 | Skills graph database          |
+| **ClickHouse** | 8123, 9000 | Analytics OLAP database        |
+| **MinIO**      | 9002, 9003 | Object storage (API + Console) |
+| **Kafka**      | 9092       | Event streaming                |
 
 **Application Services:**
 
-| Service | Port | Description |
-|---------|------|-------------|
-| **API** | 4000 | Core NestJS API |
-| **BFF** | 4001 | Frontend aggregation layer |
-| **Web** | 3000 | Next.js dashboard |
-| **AI Service** | 8000 | FastAPI ML service |
+| Service        | Port | Description                |
+| -------------- | ---- | -------------------------- |
+| **API**        | 4000 | Core NestJS API            |
+| **BFF**        | 4001 | Frontend aggregation layer |
+| **Web**        | 3000 | Next.js dashboard          |
+| **AI Service** | 8000 | FastAPI ML service         |
 
 ---
 
@@ -248,6 +252,7 @@ pnpm typecheck         # Type check all packages
 ### Core API Endpoints
 
 #### Authentication
+
 ```http
 POST /auth/register          # User registration
 POST /auth/login             # User login
@@ -256,6 +261,7 @@ GET  /auth/profile           # Get user profile
 ```
 
 #### Jobs
+
 ```http
 GET    /jobs                 # List all jobs
 POST   /jobs                 # Create job posting
@@ -266,6 +272,7 @@ POST   /jobs/:id/publish     # Publish job
 ```
 
 #### Candidates
+
 ```http
 GET    /candidates           # List candidates
 POST   /candidates           # Create candidate
@@ -276,6 +283,7 @@ GET    /candidates/:id/matches # Get job matches
 ```
 
 #### Interviews
+
 ```http
 GET    /interviews           # List interviews
 POST   /interviews           # Schedule interview
@@ -285,6 +293,7 @@ GET    /interviews/:id/transcript # Get transcription
 ```
 
 #### Analytics
+
 ```http
 GET    /analytics/overview   # Dashboard metrics
 GET    /analytics/jobs/:id   # Job-specific analytics
@@ -293,6 +302,7 @@ POST   /analytics/query      # Custom ClickHouse query
 ```
 
 #### Skills Graph
+
 ```http
 GET    /skills               # List all skills
 POST   /skills/relate        # Create skill relationship
@@ -336,6 +346,7 @@ SQL scripts in `infra/sql/init.sql` and `infra/clickhouse/init.sql` are automati
 ### AI Service Configuration
 
 Python dependencies are managed in `services/ai/requirements.txt`:
+
 - FastAPI
 - OpenAI SDK
 - Whisper (OpenAI)
@@ -347,6 +358,7 @@ Python dependencies are managed in `services/ai/requirements.txt`:
 ## 📦 Tech Stack
 
 ### Backend
+
 - **NestJS**: API framework with CQRS pattern
 - **Prisma**: Type-safe database ORM
 - **FastAPI**: AI service framework (Python)
@@ -355,27 +367,32 @@ Python dependencies are managed in `services/ai/requirements.txt`:
 - **Passport**: Authentication strategies
 
 ### Frontend
+
 - **Next.js 15**: React framework with App Router
 - **TypeScript**: Type safety
 - **Tailwind CSS**: Styling
 - **shadcn/ui**: Component library
 
 ### Databases
+
 - **PostgreSQL**: Primary database with pgvector extension
 - **Redis**: Caching and pub/sub
 - **Neo4j**: Graph database for skills relationships
 - **ClickHouse**: OLAP for analytics
 
 ### Storage & Messaging
+
 - **MinIO**: S3-compatible object storage
 - **Kafka**: Event streaming platform
 
 ### Observability
+
 - **OpenTelemetry**: Distributed tracing
 - **Prometheus**: Metrics collection
 - **Grafana**: Visualization (configured in infra)
 
 ### DevOps
+
 - **Docker**: Containerization
 - **Kubernetes**: Orchestration
 - **Helm**: Package manager
@@ -440,6 +457,7 @@ terraform apply
 ## 🤝 Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Ensure tests pass (`pnpm test`)
