@@ -465,9 +465,9 @@ Contributions are welcome! Please:
 
 ---
 
-## 📄 License
+## � License
 
-[Add your license here]
+Proprietary - All rights reserved.
 
 ---
 
