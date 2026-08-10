@@ -1,0 +1,43 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Candidate {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  fullName    String
+  title       String?
+  skills      String[]
+  summary     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  interviews  Interview[]
+}
+
+model JobPosting {
+  id          String   @id @default(uuid())
+  title       String
+  company     String
+  location    String
+  requirements String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  interviews  Interview[]
+}
+
+model Interview {
+  id          String   @id @default(uuid())
+  candidateId String
+  jobId       String
+  score       Float    @default(0)
+  status      String   @default("SCHEDULED") // 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
+  createdAt   DateTime @default(now())
+
+  candidate Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
