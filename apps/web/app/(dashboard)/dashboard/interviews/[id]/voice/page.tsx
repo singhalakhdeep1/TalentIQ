@@ -1,8 +1,10 @@
 'use client';
 
+import React from 'react';
 import { VoiceInterviewPlayer } from '@/components/VoiceInterviewPlayer';
 
-export default function VoiceInterviewPage({ params }: { params: { id: string } }) {
+export default function VoiceInterviewPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = React.use(params);
     return (
         <div className="space-y-6 animate-rise">
             <section>
@@ -12,7 +14,7 @@ export default function VoiceInterviewPage({ params }: { params: { id: string } 
                 </p>
             </section>
 
-            <VoiceInterviewPlayer interviewId={params.id} candidateId="demo-candidate" jobId="demo-job" />
+            <VoiceInterviewPlayer interviewId={id} candidateId="demo-candidate" jobId="demo-job" />
         </div>
     );
 }

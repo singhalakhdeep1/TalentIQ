@@ -1,18 +1,20 @@
 'use client';
 
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchHiringFunnel, fetchJob } from '@/lib/api';
 import { HiringFunnelChart } from '@/components/HiringFunnelChart';
 
-export default function JobDetailsPage({ params }: { params: { id: string } }) {
+export default function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = React.use(params);
     const { data: job, isLoading: jobLoading } = useQuery({
-        queryKey: ['job', params.id],
-        queryFn: () => fetchJob(params.id),
+        queryKey: ['job', id],
+        queryFn: () => fetchJob(id),
     });
 
     const { data: funnel, isLoading: funnelLoading } = useQuery({
-        queryKey: ['funnel', params.id],
-        queryFn: () => fetchHiringFunnel(params.id),
+        queryKey: ['funnel', id],
+        queryFn: () => fetchHiringFunnel(id),
     });
 
     if (jobLoading || funnelLoading) {

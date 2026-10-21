@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fetchCandidate, fetchCandidateTimeline } from '@/lib/api';
@@ -9,14 +10,15 @@ interface TimelineEvent {
     occurredAt?: string;
 }
 
-export default function CandidatePage({ params }: { params: { id: string } }) {
+export default function CandidatePage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = React.use(params);
     const { data: candidate } = useQuery({
-        queryKey: ['candidate', params.id],
-        queryFn: () => fetchCandidate(params.id),
+        queryKey: ['candidate', id],
+        queryFn: () => fetchCandidate(id),
     });
     const { data: timeline } = useQuery({
-        queryKey: ['candidateTimeline', params.id],
-        queryFn: () => fetchCandidateTimeline(params.id),
+        queryKey: ['candidateTimeline', id],
+        queryFn: () => fetchCandidateTimeline(id),
     });
 
     return (
