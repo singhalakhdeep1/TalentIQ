@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BriefcaseBusiness, LayoutDashboard, Mic2, Users } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, LayoutDashboard, Mic2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/jobs/demo-job', label: 'Jobs', icon: BriefcaseBusiness },
+    { href: '/dashboard/jobs', label: 'Jobs', icon: BriefcaseBusiness },
+    { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/dashboard/candidates/demo-candidate', label: 'Candidates', icon: Users },
     { href: '/dashboard/interviews/demo/voice', label: 'Voice Interview', icon: Mic2 },
 ];
